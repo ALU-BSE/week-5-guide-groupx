@@ -4,8 +4,11 @@ from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import UserRegistrationSerializer, UserSerializer
 from drf_spectacular.utils import extend_schema
-from rest_framework_simplejwt.views import TokenObtainPairView 
+from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+
 
 class RegisterView(generics.CreateAPIView):
     """API endpoint for user registration"""
@@ -19,11 +22,11 @@ class RegisterView(generics.CreateAPIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-ls
-        
+        user = serializer.save()  # for saving a user
+
         # Generate tokens
         refresh = RefreshToken.for_user(user)
-        
+
         return Response({
             'user': UserSerializer(user).data,
             'tokens': {
@@ -33,7 +36,8 @@ ls
             'message': 'User registered successfully'
         }, status=status.HTTP_201_CREATED)
 
-lass CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Custom token serializer to include user data"""
     def validate(self, attrs):
         data = super().validate(attrs)
@@ -50,4 +54,30 @@ class LoginView(TokenObtainPairView):
         description="Authenticate user and receive JWT tokens"
     )
     def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)   
+        return super().post(request, *args, **kwargs)
+
+class UserProfileView(APIView):
+    """API endpoint to retrieve and update user profile"""
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Get user profile",
+        description="Retrieve authenticated user's profile"
+    )
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary="Update user profile",
+        description="Update authenticated user's profile"
+    )
+    def put(self, request):
+        serializer = UserSerializer(
+            request.user, 
+            data=request.data, 
+            partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
